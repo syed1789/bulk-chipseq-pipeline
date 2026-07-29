@@ -1,0 +1,11 @@
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+.snakemake/
+data/fastq/*.fastq.gz
+data/reference/genome.fa
+data/reference/genes.bed
+data/reference/saccer_index.*.bt2
+results/bowtie2/*.sorted.bam
+results/bowtie2/*.sorted.bam.bai

@@ -1,0 +1,94 @@
+"""
+Classical bulk ChIP-seq: bowtie2 end-to-end alignment -> MACS3 peak calling
+(IP vs. matched Input control, per replicate) -> replicate concordance QC.
+"""
+import os
+
+REPS = {"rep1": ("IP1", "Input1"), "rep2": ("IP2", "Input2")}
+SAMPLE_FILES = {
+    "IP1": "SRR5204807_Spt5-ChIP_IP1_SacCer_ChIP-Seq_ss100k",
+    "IP2": "SRR5204808_Spt5-ChIP_IP2_SacCer_ChIP-Seq_ss100k",
+    "Input1": "SRR5204809_Spt5-ChIP_Input1_SacCer_ChIP-Seq_ss100k",
+    "Input2": "SRR5204810_Spt5-ChIP_Input2_SacCer_ChIP-Seq_ss100k",
+}
+
+BOWTIE2_IMAGE = "quay.io/biocontainers/bowtie2:2.5.5--ha27dd3b_0"
+MACS3_IMAGE = "quay.io/biocontainers/macs3:3.0.4--py313hda738de_0"
+WORKDIR = os.getcwd()
+
+
+rule all:
+    input:
+        expand("results/macs3/spt5_{rep}_peaks.narrowPeak", rep=REPS),
+        "results/replicate_concordance.tsv",
+
+
+rule bowtie2_index:
+    input:
+        "data/reference/genome.fa",
+    output:
+        multiext(
+            "data/reference/saccer_index",
+            ".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2",
+        ),
+    shell:
+        """
+        docker run --rm -v {WORKDIR}:/data {BOWTIE2_IMAGE} \
+          bowtie2-build --threads 4 /data/{input} /data/data/reference/saccer_index
+        """
+
+
+rule bowtie2_align:
+    input:
+        index=rules.bowtie2_index.output,
+        r1="data/fastq/{sample}_R1.fastq.gz",
+        r2="data/fastq/{sample}_R2.fastq.gz",
+    output:
+        sam=temp("results/bowtie2/{sample}.sam"),
+    shell:
+        """
+        docker run --rm -v {WORKDIR}:/data {BOWTIE2_IMAGE} \
+          bowtie2 --sensitive -X 700 -p 4 \
+            -x /data/data/reference/saccer_index \
+            -1 /data/{input.r1} -2 /data/{input.r2} \
+            -S /data/{output.sam}
+        """
+
+
+rule sort_index_bam:
+    input:
+        "results/bowtie2/{sample}.sam",
+    output:
+        bam="results/bowtie2/{sample}.sorted.bam",
+        bai="results/bowtie2/{sample}.sorted.bam.bai",
+    shell:
+        """
+        samtools sort -@ 4 -o {output.bam} {input}
+        samtools index {output.bam}
+        """
+
+
+rule macs3_callpeak:
+    input:
+        treatment=lambda wc: f"results/bowtie2/{SAMPLE_FILES[REPS[wc.rep][0]]}.sorted.bam",
+        control=lambda wc: f"results/bowtie2/{SAMPLE_FILES[REPS[wc.rep][1]]}.sorted.bam",
+    output:
+        "results/macs3/spt5_{rep}_peaks.narrowPeak",
+    shell:
+        """
+        docker run --rm -v {WORKDIR}:/data {MACS3_IMAGE} \
+          macs3 callpeak \
+            -t /data/{input.treatment} -c /data/{input.control} \
+            -f BAMPE -g 1.2e7 -n spt5_{wildcards.rep} \
+            --outdir /data/results/macs3 -q 0.05
+        """
+
+
+rule replicate_concordance:
+    input:
+        rep1="results/macs3/spt5_rep1_peaks.narrowPeak",
+        rep2="results/macs3/spt5_rep2_peaks.narrowPeak",
+    output:
+        "results/replicate_concordance.tsv",
+    script:
+        "../scripts/replicate_concordance.py"

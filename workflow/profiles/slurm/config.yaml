@@ -1,0 +1,21 @@
+# Snakemake SLURM executor profile -- not run against a real cluster in this
+# repo (no SLURM allocation in this environment), same disclosed pattern as
+# my other Snakemake repos (bulk-rnaseq-star-deseq2, cutandrun-pipeline).
+executor: slurm
+jobs: 20
+default-resources:
+  slurm_partition: "compute"
+  mem_mb: 4000
+  runtime: 20
+set-resources:
+  bowtie2_index:
+    mem_mb: 4000
+    runtime: 15
+  bowtie2_align:
+    mem_mb: 4000
+    runtime: 15
+  macs3_callpeak:
+    mem_mb: 2000
+    runtime: 10
+latency-wait: 30
+rerun-incomplete: true
