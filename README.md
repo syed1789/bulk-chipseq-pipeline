@@ -1,5 +1,7 @@
 # Bulk ChIP-seq: bowtie2 + MACS3, Input-Controlled Peak Calling
 
+[![CI](https://github.com/syed1789/bulk-chipseq-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/syed1789/bulk-chipseq-pipeline/actions/workflows/ci.yml)
+
 **Author:** Syed Nurul Hasan, Ph.D.
 **Contact:** nayanchoton1789@gmail.com | [ORCID: 0000-0002-4564-872X](https://orcid.org/0000-0002-4564-872X)
 
